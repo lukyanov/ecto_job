@@ -24,7 +24,7 @@ A transactional job queue built with Ecto, PostgreSQL and GenStage
 Add `:ecto_job` to your `dependencies`
 
 ```elixir
-  {:ecto_job, "~> 3.0"}
+  {:ecto_job, "~> 3.1"}
 ```
 
 ## Installation
@@ -53,6 +53,17 @@ defmodule MyApp.Repo.Migrations.CreateJobQueue do
 end
 ```
 
+By default, a job holds a map of arbitrary data (which corresponds to a `jsonb` field in the table).
+If you want to store an arbitrary Elixir/Erlang term in the job (`bytea` in the table),
+you can set up the `params_type` option:
+
+```
+  def up do
+    EctoJob.Migrations.Install.up()
+    EctoJob.Migrations.CreateJobTable.up("jobs", version: @ecto_job_version, params_type: :binary)
+  end
+```
+
 ### Upgrading to version 3.0
 
 To upgrade your project to 3.0 version of `ecto_job` you must add a migration to update the pre-existent job queue tables:
@@ -75,12 +86,22 @@ defmodule MyApp.Repo.Migrations.UpdateJobQueue do
 end
 ```
 
+
+
 Add a module for the queue, mix in `EctoJob.JobQueue`.
 This will declare an `Ecto.Schema` to use with the table created in the migration, and a `start_link` function allowing the worker supervision tree to be started conveniently.
 
 ```elixir
 defmodule MyApp.JobQueue do
   use EctoJob.JobQueue, table_name: "jobs"
+end
+```
+
+For jobs being Elixir/Erlang terms, you should add the `:params_type` option:
+
+```elixir
+defmodule MyApp.JobQueue do
+  use EctoJob.JobQueue, table_name: "jobs", params_type: :binary
 end
 ```
 
@@ -123,6 +144,22 @@ A job can be inserted into the Repo directly by constructing a job with the `new
 
 ```elixir
 %{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new()
+|> MyApp.Repo.insert()
+```
+
+For inserting any arbitrary Elixir/Erlang term:
+
+```elixir
+{"SendEmail", "joe@gmail.com", "Welcome!"}
+|> MyApp.JobQueue.new()
+|> MyApp.Repo.insert()
+```
+
+or
+
+```elixir
+|> %MyStruct{}
 |> MyApp.JobQueue.new()
 |> MyApp.Repo.insert()
 ```
